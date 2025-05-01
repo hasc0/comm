@@ -2,21 +2,20 @@
 #include <cstdlib>
 #include <cstring>
 
-#include <netinet/in.h>
 #include <sys/types.h>
 #include <sys/socket.h>
-#include <arpa/inet.h>
 #include <netdb.h>
 
 class comm_server {
 private:
-	const char *addr;
+	char *addr;
+	int port;
 	int s_socket_fd;
 
 public:
-	comm_server(char *addr) : addr(addr) {}
+	comm_server(char *addr, int port) : addr(addr), port(port) {}
 
-	bool start() {
+	bool init_server() {
 		std::cout << "Starting comm server..." << std::endl;
 
 		struct addrinfo *s_addr_res;
@@ -61,38 +60,42 @@ public:
 			}
 		}
 
-		if (bind(s_socket_fd, s_addr_info->ai_addr, s_addr_info->ai_addrlen) == -1) {
+		struct sockaddr_in *s_sock_info = (struct sockaddr_in *) s_addr_info->ai_addr;
+		s_sock_info->sin_port = htons(port);
+
+		if (bind(s_socket_fd, (sockaddr *) s_sock_info, s_addr_info->ai_addrlen) == -1) {
 			std::cerr << "Failed to bind socket to address.\n";
 			freeaddrinfo(s_addr_res);
 			return false;
 		}
 
-		char addr_res[INET_ADDRSTRLEN];
-		inet_ntop(AF_INET, s_addr_info->ai_addr->sa_data, addr_res, INET_ADDRSTRLEN);
-
-		std::cout << "Server is running at " << addr_res << std::endl;
+		std::cout << "Server is running at " << this->addr << ":" << this->port << std::endl;
 
 		freeaddrinfo(s_addr_res);
 		this->s_socket_fd = s_socket_fd;
 
 		return true;
 	}
+
+	void start_server() {
+		while (true) {
+			listen(this->s_socket_fd, 128);
+		}
+	}
 };
 
 int main(int argc, char *argv[]) {
-	if (argc != 2) {
-		std::cerr << "Please supply a valid address.\nUsage: " << argv[0] << " [address]\n";
+	if (argc != 3) {
+		std::cerr << "Please supply a valid address and port.\nUsage: " << argv[0] << " [address] [port]\n";
 		exit(EXIT_FAILURE);
 	}
 
-	comm_server c_server = comm_server(argv[1]);
-	if (!c_server.start()) {
+	comm_server c_server = comm_server(argv[1], atoi(argv[2]));
+	if (!c_server.init_server()) {
 		exit(EXIT_FAILURE);
 	}
 
-	while (true) {
-		exit(EXIT_SUCCESS);
-	}
+	c_server.start_server();
 
 	return EXIT_SUCCESS;
 }
