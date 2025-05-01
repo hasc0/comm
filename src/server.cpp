@@ -1,4 +1,5 @@
 #include <iostream>
+#include <vector>
 #include <cstdlib>
 #include <cstring>
 
@@ -6,14 +7,19 @@
 #include <sys/socket.h>
 #include <netdb.h>
 
+using std::vector;
+
 class comm_server {
 private:
-	char *addr;
-	int port;
+	const char *addr;
+	const int port;
 	int s_socket_fd;
+	int max_clients;
+	int num_clients;
+	vector<int> clients;
 
 public:
-	comm_server(char *addr, int port) : addr(addr), port(port) {}
+	comm_server(char *addr, int port) : addr(addr), port(port), max_clients(128), num_clients(0) {}
 
 	bool init_server() {
 		std::cout << "Starting comm server..." << std::endl;
@@ -69,8 +75,6 @@ public:
 			return false;
 		}
 
-		std::cout << "Server is running at " << this->addr << ":" << this->port << std::endl;
-
 		freeaddrinfo(s_addr_res);
 		this->s_socket_fd = s_socket_fd;
 
@@ -78,8 +82,12 @@ public:
 	}
 
 	void start_server() {
+		listen(this->s_socket_fd, 128);
+
+		std::cout << "Server is listening at " << this->addr << ":" << this->port << std::endl;
+
 		while (true) {
-			listen(this->s_socket_fd, 128);
+
 		}
 	}
 };
