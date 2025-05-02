@@ -1,104 +1,79 @@
 #include <iostream>
+#include <string>
 #include <vector>
-#include <cstdlib>
-#include <cstring>
 
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netdb.h>
 
+#include "shared.hpp"
+
+using std::string;
 using std::vector;
 
 class comm_server {
 private:
-	const char *addr;
+	const string addr;
 	const int port;
-	int s_socket_fd;
-	int max_clients;
-	int num_clients;
+
+	struct commsock *sock;
+
+	size_t max_clients;
 	vector<int> clients;
 
 public:
-	comm_server(char *addr, int port) : addr(addr), port(port), max_clients(128), num_clients(0) {}
+	comm_server(string addr, int port) : addr(addr), port(port), max_clients(128) {}
 
 	bool init_server() {
 		std::cout << "Starting comm server..." << std::endl;
 
-		struct addrinfo *s_addr_res;
-		struct addrinfo s_addr_hints = {
-			.ai_flags = 0,
-			.ai_family = AF_INET,
-			.ai_socktype = SOCK_STREAM,
-			.ai_protocol = IPPROTO_TCP,
-			.ai_addrlen = 0,
-			.ai_addr = NULL,
-			.ai_canonname = NULL,
-			.ai_next = NULL
-		};
-
-		if (int err = getaddrinfo(this->addr, NULL, &s_addr_hints, &s_addr_res) != 0) {
-			std::cerr << "Failed to resolve address (error " << err << ")\n";
+		struct commsock *sock = (struct commsock *) calloc(1, sizeof(struct commsock));
+		if (!get_socket(this->addr, this->port, sock)) {
 			return false;
 		}
 
-		struct addrinfo *s_addr_info = s_addr_res;
-
-		int s_socket_fd = socket(s_addr_info->ai_family, s_addr_info->ai_socktype, s_addr_info->ai_protocol);
-		if (s_socket_fd == -1 && s_addr_info->ai_next == NULL) {
-			std::cerr << "Failed to create socket.\n";
-			freeaddrinfo(s_addr_res);
-			return false;
-		} else if (s_socket_fd == -1 && s_addr_info->ai_next != NULL) {
-			struct addrinfo *s_addr_curr = s_addr_info;
-			struct addrinfo *s_addr_next = s_addr_info->ai_next;
-			while (s_socket_fd == -1 && s_addr_next != NULL) {
-				s_socket_fd = socket(s_addr_next->ai_family, s_addr_next->ai_socktype, s_addr_next->ai_protocol);
-				s_addr_curr = s_addr_next;
-				s_addr_next = s_addr_curr->ai_next;
-			}
-
-			if (s_socket_fd == -1) {
-				std::cerr << "Failed to create socket.\n";
-				freeaddrinfo(s_addr_res);
-				return false;
-			} else {
-				s_addr_info = s_addr_curr;
-			}
-		}
-
-		struct sockaddr_in *s_sock_info = (struct sockaddr_in *) s_addr_info->ai_addr;
-		s_sock_info->sin_port = htons(port);
-
-		if (bind(s_socket_fd, (sockaddr *) s_sock_info, s_addr_info->ai_addrlen) == -1) {
+		if (bind(sock->sock_fd, (sockaddr *) sock->sock_info, sock->addr_len) == -1) {
 			std::cerr << "Failed to bind socket to address.\n";
-			freeaddrinfo(s_addr_res);
 			return false;
 		}
 
-		freeaddrinfo(s_addr_res);
-		this->s_socket_fd = s_socket_fd;
+		this->sock = sock;
 
 		return true;
 	}
 
 	void start_server() {
-		listen(this->s_socket_fd, 128);
+		if (listen(this->sock->sock_fd, 128) == -1) {
+			std::cerr << "Failed to listen for connections.\n";
+			exit(EXIT_FAILURE);
+		}
 
 		std::cout << "Server is listening at " << this->addr << ":" << this->port << std::endl;
 
 		while (true) {
-
+			if (clients.size() < max_clients) {
+				int client_fd = accept(this->sock->sock_fd, (struct sockaddr *) this->sock->sock_info, &this->sock->addr_len);
+				if (client_fd == -1) {
+					std::cout << "Failed to establish connection with client." << std::endl;
+				} else {
+					clients.push_back(client_fd);
+					std::cout << "Connection established with client." << std::endl;
+				}
+			}
 		}
 	}
 };
 
-int main(int argc, char *argv[]) {
-	if (argc != 3) {
-		std::cerr << "Please supply a valid address and port.\nUsage: " << argv[0] << " [address] [port]\n";
-		exit(EXIT_FAILURE);
-	}
+int main() {
+	string addr;
+	std::cout << "Please enter an IPv4 address: ";
+	std::getline(std::cin, addr);
 
-	comm_server c_server = comm_server(argv[1], atoi(argv[2]));
+	string port;
+	std::cout << "Please enter a port: ";
+	std::getline(std::cin, port);
+
+	comm_server c_server = comm_server(addr, stoi(port));
 	if (!c_server.init_server()) {
 		exit(EXIT_FAILURE);
 	}
