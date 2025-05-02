@@ -32,7 +32,7 @@ public:
 			return false;
 		}
 
-		if (bind(sock->sock_fd, (sockaddr *) sock->sock_info, sock->addr_len) == -1) {
+		if (bind(sock->sock_fd, (sockaddr *) sock->sock_addr, sock->sock_len) == -1) {
 			std::cerr << "Failed to bind socket to address.\n";
 			return false;
 		}
@@ -52,7 +52,7 @@ public:
 
 		while (true) {
 			if (clients.size() < max_clients) {
-				int client_fd = accept(this->sock->sock_fd, (struct sockaddr *) this->sock->sock_info, &this->sock->addr_len);
+				int client_fd = accept(this->sock->sock_fd, (struct sockaddr *) this->sock->sock_addr, &this->sock->sock_len);
 				if (client_fd == -1) {
 					std::cout << "Failed to establish connection with client." << std::endl;
 				} else {

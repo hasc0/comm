@@ -37,7 +37,7 @@ public:
 
 		std::cout << "Attempting to connect to server..." << std::endl;
 
-		if (connect(sock->sock_fd, (struct sockaddr *) sock->sock_info, sock->addr_len) == -1) {
+		if (connect(sock->sock_fd, (struct sockaddr *) sock->sock_addr, sock->sock_len) == -1) {
 			std::cerr << "Failed to connect to server.\n";
 			return false;
 		}
